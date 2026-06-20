@@ -1,0 +1,257 @@
+// Forkcast schema.
+// Kept portable (no Postgres-only features) so the dev SQLite DB can move to
+// Postgres in prod with a one-line datasource change.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// The owned asset: a canonical ingredient with grocery metadata.
+/// Recipes reference these; the overlap engine operates on ingredient ids.
+model Ingredient {
+  id             Int                @id @default(autoincrement())
+  name           String             @unique // canonical key, lowercased (e.g. "chicken breast")
+  displayName    String // nicely cased for UI (e.g. "Chicken Breast")
+  aisle          String // grocery aisle, e.g. "Produce", "Meat & Seafood"
+  isStaple       Boolean            @default(false) // pantry item assumed on hand (salt, oil, spices)
+  packPriceCents Int                @default(0) // typical cost of one grocery purchase of this item
+  packLabel      String             @default("") // what that purchase looks like, e.g. "1 lb", "1 bunch"
+  recipeLinks    RecipeIngredient[]
+  createdAt      DateTime           @default(now())
+}
+
+/// A recipe ingested from a public source (TheMealDB) into our own DB.
+model Recipe {
+  id           Int                @id @default(autoincrement())
+  sourceId     String             @unique // e.g. TheMealDB idMeal
+  source       String             @default("themealdb")
+  title        String
+  category     String? // Chicken, Beef, Vegetarian, ...
+  area         String? // cuisine
+  tags         String? // comma-separated
+  instructions String
+  imageUrl     String?
+  servings     Int                @default(4)
+  enriched     String? // LLM-normalized structured recipe (JSON RecipeDetail) — see scripts/enrich.ts
+  enrichedAt   DateTime?
+  ingredients  RecipeIngredient[]
+  createdAt    DateTime           @default(now())
+}
+
+/// A launch-page waitlist signup. The first real "account-shaped" data we keep —
+/// just an email and where it came from, ahead of the full accounts/billing work.
+model WaitlistSignup {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  source    String   @default("launch") // which surface captured it (hero, footer, …)
+  createdAt DateTime @default(now())
+}
+
+/// Join row linking a recipe to a canonical ingredient, with the original measure.
+model RecipeIngredient {
+  id           Int     @id @default(autoincrement())
+  recipeId     Int
+  ingredientId Int
+  rawMeasure   String // original free-text measure, e.g. "2 cups"
+  quantity     Float? // parsed numeric amount, when we can
+  unit         String? // parsed unit, when we can
+
+  recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, ingredientId])
+  @@index([ingredientId])
+}
+
+// ============================================================================
+// Accounts, billing & the production SaaS layer.
+// Enum-like fields use String for SQLite portability (Postgres can keep String
+// or be migrated to native enums later). JSON payloads are stored as String.
+// ============================================================================
+
+/// A registered user. Auth.js (NextAuth) owns the core auth fields; the rest is
+/// Forkcast's own profile/billing data.
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  role             String  @default("user") // "user" | "admin"
+  stripeCustomerId String? @unique
+  referralCode     String? @unique
+  referredByCode   String?
+
+  createdAt DateTime @default(now())
+
+  accounts     Account[]
+  sessions     Session[]
+  subscription Subscription?
+  addresses    Address[]
+  plans        SavedPlan[]
+  planLogs     PlanGenerationLog[]
+}
+
+/// OAuth / external provider account (Auth.js Prisma adapter shape).
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+/// Database session (Auth.js Prisma adapter shape).
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Email magic-link / verification token (Auth.js Prisma adapter shape).
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// Subscription state mirrored from Stripe webhooks. The source of truth for
+/// entitlements (see src/lib/entitlements.ts).
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  plan                 String    @default("free") // "free" | "pro"
+  status               String    @default("inactive") // Stripe status: active|trialing|past_due|canceled|...
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  updatedAt            DateTime  @updatedAt
+  createdAt            DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// A user's saved delivery/shopping address — geocoded for the cheapest-store search.
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  label      String   @default("Home")
+  line1      String
+  line2      String?
+  city       String
+  region     String // state / province
+  postalCode String
+  country    String   @default("US")
+  lat        Float?
+  lng        Float?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// A generated week, persisted for history and the weekly email. JSON columns
+/// hold the engine's Preferences and PlanResult.
+model SavedPlan {
+  id         String    @id @default(cuid())
+  userId     String
+  prefsJson  String
+  resultJson String
+  weekOf     DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// Cached grocery store resolved from a places provider near a user.
+model StoreLocation {
+  id               String   @id @default(cuid())
+  provider         String // "google" | "osm" | "kroger"
+  externalId       String // provider's place/location id
+  chain            String // normalized chain key, e.g. "kroger", "walmart"
+  name             String
+  lat              Float
+  lng              Float
+  address          String?
+  krogerLocationId String?
+  createdAt        DateTime @default(now())
+
+  prices StorePrice[]
+
+  @@unique([provider, externalId])
+  @@index([chain])
+}
+
+/// Cached price of one canonical ingredient at one store. `source` distinguishes
+/// real (retailer API) from estimated (modeled); `fetchedAt` drives the TTL.
+model StorePrice {
+  id              String   @id @default(cuid())
+  storeLocationId String
+  ingredientKey   String // Ingredient.name
+  priceCents      Int
+  source          String   @default("estimated") // "real" | "estimated"
+  fetchedAt       DateTime @default(now())
+
+  store StoreLocation @relation(fields: [storeLocationId], references: [id], onDelete: Cascade)
+
+  @@unique([storeLocationId, ingredientKey])
+}
+
+/// One plan generation, for free-tier weekly limits and usage analytics.
+model PlanGenerationLog {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// A referral conversion: a referred user became Pro, and the referrer earned a
+/// reward. One row per referred user (unique) makes the reward idempotent across
+/// repeated Stripe webhooks. Standalone (string ids) so a user delete doesn't
+/// cascade away the referrer's earned-reward record.
+model Referral {
+  id             String    @id @default(cuid())
+  referrerUserId String // who earns the reward (owner of the referral code)
+  referredUserId String    @unique // the new Pro customer who converted
+  code           String // the referralCode that was used
+  rewardKind     String? // "balance_credit" | "promo_code" — null until granted
+  rewardRef      String? // Stripe id of the credit txn / promotion code
+  rewardCode     String? // human-redeemable promo code, when rewardKind = promo_code
+  rewardedAt     DateTime? // set once the Stripe reward is granted
+  createdAt      DateTime  @default(now())
+
+  @@index([referrerUserId])
+}

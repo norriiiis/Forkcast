@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Forkcast — Plan once. Eat all week.</title>
+  <meta name="description" content="Forkcast decides what's for dinner so you don't have to. A week of dinners that share ingredients, one aisle-sorted grocery list with the price up front, a 90-minute Sunday prep plan, and the cheapest store near you. Around $5 a plate." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,600;1,9..144,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            oat: "#fbf8f2", "oat-deep": "#f4eee2", forest: "#14532d", basil: "#15803d",
+            "basil-bright": "#1f9d4e", ember: "#ea580c", char: "#1c1917", muted: "#6f6a64",
+            sage: "#e7eee4", "sage-line": "#d8e3d4", "forest-sage": "#a7c0ac",
+            brand: "#15803d", "brand-dark": "#14532d", accent: "#ea580c",
+          },
+          fontFamily: {
+            sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+            display: ["Fraunces", "Georgia", "serif"],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    :root {
+      --oat:#fbf8f2; --oat-deep:#f4eee2; --forest:#14532d; --basil:#15803d; --basil-bright:#1f9d4e;
+      --ember:#ea580c; --char:#1c1917; --muted:#6f6a64; --sage:#e7eee4; --sage-line:#d8e3d4; --forest-sage:#a7c0ac;
+      --background:#fbf8f2; --foreground:#1c1917; --brand:#15803d; --brand-dark:#14532d; --accent:#ea580c;
+    }
+    html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+    body { background: var(--oat); color: var(--char); font-family: Inter, ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    .font-display { font-family: Fraunces, Georgia, serif; }
+    .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+    .grain { position: relative; }
+    .grain::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0; opacity: .035; mix-blend-mode: multiply;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .shadow-warm { box-shadow: 0 1px 2px rgba(28,25,23,.04), 0 12px 32px -12px rgba(20,83,45,.16); }
+    .shadow-warm-lg { box-shadow: 0 1px 2px rgba(28,25,23,.05), 0 28px 60px -20px rgba(20,83,45,.28); }
+
+    @keyframes tine-grow { from { transform: scaleY(.2); } to { transform: scaleY(1); } }
+    @keyframes float-soft { 0%,100% { transform: translateY(0) rotate(var(--tilt,0deg)); } 50% { transform: translateY(-8px) rotate(var(--tilt,0deg)); } }
+    @keyframes aurora-drift { 0% { transform: translate3d(0,0,0) scale(1); } 33% { transform: translate3d(5%,-4%,0) scale(1.12); } 66% { transform: translate3d(-4%,5%,0) scale(.94); } 100% { transform: translate3d(0,0,0) scale(1); } }
+    @keyframes bob { 0%,100% { transform: translateY(0) rotate(var(--r,0deg)); } 50% { transform: translateY(-12px) rotate(var(--r,0deg)); } }
+    @keyframes draw-line { to { stroke-dashoffset: 0; } }
+    @keyframes pulse-travel { from { stroke-dashoffset: 431; } to { stroke-dashoffset: 11; } }
+
+    .aurora { will-change: transform; animation: aurora-drift 24s ease-in-out infinite; }
+    .aurora-slow { animation-duration: 34s; animation-direction: reverse; }
+    .bob { will-change: transform; animation: bob 6s ease-in-out infinite; }
+    .animate-float { animation: float-soft 7s ease-in-out infinite; }
+
+    .tine { transform-origin: bottom; transform-box: fill-box; }
+    .animate-mark .tine { animation: tine-grow .5s cubic-bezier(.22,1,.36,1) both; }
+    .animate-mark .tine:nth-child(1){animation-delay:.05s} .animate-mark .tine:nth-child(2){animation-delay:.13s}
+    .animate-mark .tine:nth-child(3){animation-delay:.21s} .animate-mark .tine:nth-child(4){animation-delay:.29s}
+
+    .tilt-scene { perspective: 1200px; }
+    .tilt { transform: rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)); transition: transform .25s ease-out; transform-style: preserve-3d; will-change: transform; }
+    .tilt-pop { transform: translateZ(40px); transform-style: preserve-3d; }
+
+    .scroll-progress { position: fixed; inset: 0 0 auto 0; height: 3px; z-index: 60; transform-origin: 0 50%; transform: scaleX(var(--p,0)); background: linear-gradient(90deg, var(--basil), var(--ember)); }
+
+    .sheen { position: relative; overflow: hidden; isolation: isolate; }
+    .sheen::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); transform: translateX(-130%); transition: transform .6s cubic-bezier(.22,1,.36,1); }
+    .sheen:hover::after { transform: translateX(130%); }
+    .lift { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s cubic-bezier(.22,1,.36,1); }
+    .lift:hover { transform: translateY(-6px); }
+
+    .flow-line { stroke-dasharray: var(--len,320); stroke-dashoffset: var(--len,320); }
+    [data-shown] .flow-line { animation: draw-line 1.1s cubic-bezier(.22,1,.36,1) forwards; }
+    [data-shown] .flow-line.l2 { animation-delay: .18s; } [data-shown] .flow-line.l3 { animation-delay: .36s; }
+    .flow-pulse { stroke-dasharray: 11 420; stroke-dashoffset: 431; opacity: 0; }
+    [data-shown] .flow-pulse { opacity: 1; animation: pulse-travel 2.8s linear infinite; animation-delay: 1s; }
+    [data-shown] .flow-pulse.p2 { animation-delay: 1.5s; } [data-shown] .flow-pulse.p3 { animation-delay: 2s; }
+    .grow-bar { transform: scaleX(0); transform-origin: left center; transition: transform 1.1s cubic-bezier(.22,1,.36,1); }
+    [data-shown] .grow-bar { transform: scaleX(1); }
+
+    [data-reveal] { transition: opacity .8s cubic-bezier(.22,1,.36,1), transform .85s cubic-bezier(.22,1,.36,1), filter .8s ease; opacity: 0; }
+    [data-reveal="up"] { transform: translateY(32px); }
+    [data-reveal="left"] { transform: translateX(-36px); }
+    [data-reveal="right"] { transform: translateX(36px); }
+    [data-reveal="scale"] { transform: scale(.92); }
+    [data-reveal][data-shown] { opacity: 1; transform: none; filter: none; }
+
+    [hidden] { display: none !important; }
+    select { -webkit-appearance: none; appearance: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      [data-reveal] { opacity: 1; transform: none; transition: none; }
+      .animate-mark .tine, .animate-float, .aurora, .bob, [data-shown] .flow-pulse, [data-shown] .flow-line { animation: none; }
+      .flow-line { stroke-dashoffset: 0; } .grow-bar { transform: none; } .tilt { transform: none !important; }
+    }
+  </style>
+</head>
+<body class="min-h-full">
+  <div class="scroll-progress" aria-hidden="true"></div>
+
+  <!-- ====================== LANDING VIEW ====================== -->
+  <div id="view-landing" class="relative min-h-screen overflow-x-clip bg-oat text-char">
+    <!-- Nav -->
+    <header class="sticky top-0 z-40 border-b border-sage-line/60 bg-oat/80 backdrop-blur-md">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
+        <a href="#" class="flex items-center gap-2.5" aria-label="Forkcast home">
+          <span class="h-7 w-7">__MARK_ANIMATE__</span>
+          <span class="font-display text-[1.35rem] font-black leading-none tracking-tight text-forest">Forkcast</span>
+        </a>
+        <nav class="hidden items-center gap-7 text-sm font-medium text-muted md:flex">
+          <a href="#how" class="transition hover:text-forest">How it works</a>
+          <a href="#week" class="transition hover:text-forest">See a week</a>
+          <a href="#math" class="transition hover:text-forest">The math</a>
+          <a href="#waitlist" class="transition hover:text-forest">Get updates</a>
+        </nav>
+        <button class="js-plan sheen rounded-full bg-basil px-4 py-2 text-sm font-semibold text-oat shadow-sm transition hover:bg-forest">Plan my week</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Hero -->
+      <section class="grain relative overflow-hidden">
+        <div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
+          <div class="aurora absolute -right-32 -top-40 h-[36rem] w-[36rem] rounded-full opacity-70 blur-3xl" style="background: radial-gradient(circle, rgba(234,88,12,.14), rgba(21,128,61,.05) 50%, transparent 72%)"></div>
+          <div class="aurora aurora-slow absolute -left-40 top-24 h-[32rem] w-[32rem] rounded-full opacity-60 blur-3xl" style="background: radial-gradient(circle, rgba(21,128,61,.12), transparent 70%)"></div>
+          <div class="aurora absolute bottom-[-10rem] right-1/4 h-[28rem] w-[28rem] rounded-full opacity-50 blur-3xl" style="background: radial-gradient(circle, rgba(232,238,228,.6), transparent 70%); animation-delay:-8s"></div>
+        </div>
+        <div class="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-16 sm:pt-20 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:pb-28">
+          <div>
+            <div data-reveal="up"><span class="inline-flex items-center gap-2 rounded-full border border-sage-line bg-sage/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-basil"><span class="h-1.5 w-1.5 rounded-full bg-ember"></span>Meal planning, minus the planning</span></div>
+            <h1 data-reveal="up" style="transition-delay:60ms" class="mt-6 font-display text-[2.75rem] font-black leading-[1.02] tracking-[-0.02em] text-char sm:text-6xl">Come home to dinner that's <span class="italic text-basil">already decided.</span></h1>
+            <p data-reveal="up" style="transition-delay:120ms" class="mt-6 max-w-xl text-lg leading-relaxed text-muted">Forkcast picks a week of dinners that quietly share ingredients, then hands you <span class="font-medium text-char">one aisle-sorted grocery list with the price up front</span>, a 90-minute Sunday prep plan, and the cheapest store near you. You keep the veto.</p>
+            <div data-reveal="up" style="transition-delay:180ms" class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button class="js-plan sheen group inline-flex items-center justify-center gap-2 rounded-full bg-basil px-6 py-3.5 text-base font-semibold text-oat shadow-warm transition hover:-translate-y-0.5 hover:bg-forest">Plan my week — free <span class="transition-transform group-hover:translate-x-0.5">→</span></button>
+              <a href="#week" class="inline-flex items-center justify-center gap-2 rounded-full border border-sage-line bg-oat px-6 py-3.5 text-base font-semibold text-forest transition hover:-translate-y-0.5 hover:bg-sage/50">See a whole week</a>
+            </div>
+            <p data-reveal="up" style="transition-delay:240ms" class="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted"><span class="font-semibold text-forest tnum">~$5.18 a plate</span><span class="h-1 w-1 rounded-full bg-muted/50"></span>one grocery run<span class="h-1 w-1 rounded-full bg-muted/50"></span>cheapest store near you</p>
+          </div>
+          <div data-reveal="scale" style="transition-delay:140ms" class="lg:justify-self-end">
+            <div id="hero-parallax" class="relative mx-auto w-full max-w-sm">
+              <span aria-hidden="true" class="bob pointer-events-none absolute z-20 hidden rounded-full border border-sage-line bg-white/90 px-3 py-1 text-xs font-medium text-forest shadow-warm backdrop-blur sm:block -left-10 top-12" style="--r:-8deg">chicken</span>
+              <span aria-hidden="true" class="bob pointer-events-none absolute z-20 hidden rounded-full border border-sage-line bg-white/90 px-3 py-1 text-xs font-medium text-forest shadow-warm backdrop-blur sm:block -right-8 top-4" style="--r:7deg; animation-delay:-1.4s">onion</span>
+              <span aria-hidden="true" class="bob pointer-events-none absolute z-20 hidden rounded-full border border-sage-line bg-white/90 px-3 py-1 text-xs font-medium text-forest shadow-warm backdrop-blur sm:block -left-6 bottom-24" style="--r:6deg; animation-delay:-2.6s">garlic</span>
+              <span aria-hidden="true" class="bob pointer-events-none absolute z-20 hidden rounded-full border border-sage-line bg-white/90 px-3 py-1 text-xs font-medium text-forest shadow-warm backdrop-blur sm:block -right-10 bottom-16" style="--r:-6deg; animation-delay:-3.8s">rice</span>
+              <div class="tilt-scene" id="hero-tilt-scene">
+                <div class="tilt relative z-10 rounded-[1.75rem] border border-sage-line bg-white p-6 shadow-warm-lg" id="hero-tilt">
+                  <div class="tilt-pop absolute -left-4 -top-4 rotate-[-7deg] rounded-2xl bg-forest px-3.5 py-2 text-oat shadow-warm">
+                    <div class="text-[0.55rem] font-semibold uppercase tracking-wider text-forest-sage">You save</div>
+                    <div class="font-display text-lg font-black leading-none tnum"><span class="countup" data-to="22.60" data-prefix="$" data-decimals="2">$22.60</span></div>
+                  </div>
+                  <div class="flex items-baseline justify-between">
+                    <div><div class="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted">This week</div><div class="font-display text-2xl font-black tracking-tight text-forest">5 dinners</div></div>
+                    <div class="rounded-full bg-sage px-2.5 py-1 text-xs font-medium text-forest">serves 2</div>
+                  </div>
+                  <ul class="mt-5 space-y-2.5">
+                    <li class="flex items-center gap-3"><span class="h-2 w-2 shrink-0 rounded-full bg-basil"></span><span class="truncate text-sm font-medium text-char">Honey-Garlic Chicken Thighs</span></li>
+                    <li class="flex items-center gap-3"><span class="h-2 w-2 shrink-0 rounded-full bg-basil"></span><span class="truncate text-sm font-medium text-char">Chicken Fajita Bowls</span></li>
+                    <li class="flex items-center gap-3"><span class="h-2 w-2 shrink-0 rounded-full bg-basil"></span><span class="truncate text-sm font-medium text-char">Tuscan Chicken Pasta</span></li>
+                    <li class="flex items-center gap-3"><span class="h-2 w-2 shrink-0 rounded-full bg-basil"></span><span class="truncate text-sm font-medium text-char">Sausage & Pepper Skillet</span></li>
+                    <li class="flex items-center gap-3"><span class="h-2 w-2 shrink-0 rounded-full bg-basil"></span><span class="truncate text-sm font-medium text-char">Chickpea Coconut Curry</span></li>
+                  </ul>
+                  <div class="mt-5 flex items-end justify-between border-t border-sage-line pt-4">
+                    <div class="text-sm text-muted">One list,<br />sorted by aisle</div>
+                    <div class="text-right"><div class="font-display text-3xl font-black leading-none tnum text-ember"><span class="countup" data-to="5.18" data-prefix="$" data-decimals="2">$5.18</span></div><div class="mt-1 text-xs text-muted tnum">= $51.81 for the week</div></div>
+                  </div>
+                  <div class="mt-4 flex flex-wrap gap-2 text-[0.7rem]">
+                    <span class="inline-flex items-center gap-1 rounded-full bg-sage px-2.5 py-1 font-medium text-forest">__CHECK__ Priced before you shop</span>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-sage px-2.5 py-1 font-medium text-forest">__CHECK__ Cheapest store nearby</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pain -->
+      <section class="border-y border-sage-line/70 bg-oat-deep/60">
+        <div class="mx-auto max-w-3xl px-5 py-20 text-center sm:py-24">
+          <h2 data-reveal="up" class="font-display text-4xl font-black leading-tight tracking-tight text-char sm:text-5xl">It was never the cooking.</h2>
+          <p data-reveal="up" style="transition-delay:80ms" class="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted">It's the deciding. Fourteen dinner decisions a week — all at 6&nbsp;p.m., all on you, all when you've got nothing left. That's the chore. So that's the part we took.</p>
+        </div>
+      </section>
+
+      <!-- How -->
+      <section id="how" class="scroll-mt-20">
+        <div class="mx-auto max-w-6xl px-5 py-20 sm:py-28">
+          <div data-reveal="up">
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-basil">How it works</p>
+            <h2 class="mt-3 max-w-2xl font-display text-4xl font-black leading-tight tracking-tight text-char sm:text-5xl">Four things show up. Every week.</h2>
+          </div>
+          <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div data-reveal="up"><div class="lift group flex h-full flex-col rounded-3xl border border-sage-line bg-white p-7 shadow-warm hover:shadow-warm-lg"><div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-sage text-basil transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">__ICON_OVERLAP__</div><h3 class="mt-5 font-display text-xl font-bold tracking-tight text-forest">It finds the overlap.</h3><p class="mt-2.5 flex-1 text-sm leading-relaxed text-muted">The engine chooses dinners that quietly reuse the same ingredients — so one pack stretches across the whole week instead of rotting in the drawer.</p><div class="mt-5 inline-flex w-fit items-center rounded-lg bg-basil/10 px-3 py-1.5 text-xs font-semibold text-forest tnum">One pack of chicken thighs → 3 dinners</div></div></div>
+            <div data-reveal="up" style="transition-delay:110ms"><div class="lift group flex h-full flex-col rounded-3xl border border-sage-line bg-white p-7 shadow-warm hover:shadow-warm-lg"><div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-sage text-basil transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">__ICON_LIST__</div><h3 class="mt-5 font-display text-xl font-bold tracking-tight text-forest">One list, sorted by aisle.</h3><p class="mt-2.5 flex-1 text-sm leading-relaxed text-muted">Everything you need on a single grocery run, grouped the way the store is laid out — with the total shown before you ever check out.</p><div class="mt-5 inline-flex w-fit items-center rounded-lg bg-basil/10 px-3 py-1.5 text-xs font-semibold text-forest tnum">16 items · $51.81</div></div></div>
+            <div data-reveal="up" style="transition-delay:220ms"><div class="lift group flex h-full flex-col rounded-3xl border border-sage-line bg-white p-7 shadow-warm hover:shadow-warm-lg"><div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-sage text-basil transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">__ICON_TIMER__</div><h3 class="mt-5 font-display text-xl font-bold tracking-tight text-forest">Ninety minutes, once.</h3><p class="mt-2.5 flex-1 text-sm leading-relaxed text-muted">A Sunday prep plan that batches the shared parts — proteins, bases, sauces — so weeknight “cooking” is really just ten minutes of assembly.</p><div class="mt-5 inline-flex w-fit items-center rounded-lg bg-basil/10 px-3 py-1.5 text-xs font-semibold text-forest tnum">~90 min Sunday · ~10 min nights</div></div></div>
+            <div data-reveal="up" style="transition-delay:330ms"><div class="lift group flex h-full flex-col rounded-3xl border border-sage-line bg-white p-7 shadow-warm hover:shadow-warm-lg"><div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-sage text-basil transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">__ICON_PIN__</div><h3 class="mt-5 font-display text-xl font-bold tracking-tight text-forest">The cheapest store near you.</h3><p class="mt-2.5 flex-1 text-sm leading-relaxed text-muted">Set your location once. Forkcast prices your exact haul at every grocery store within 15 miles and points you to the one that rings up cheapest.</p><div class="mt-5 inline-flex w-fit items-center rounded-lg bg-basil/10 px-3 py-1.5 text-xs font-semibold text-forest tnum">Compared within 15 miles</div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Overlap -->
+      <section class="grain relative overflow-hidden bg-forest text-oat">
+        <div aria-hidden="true" class="aurora pointer-events-none absolute -right-20 top-1/2 h-[30rem] w-[30rem] -translate-y-1/2 rounded-full opacity-50 blur-3xl" style="background: radial-gradient(circle, rgba(31,157,78,.5), transparent 70%)"></div>
+        <div class="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 sm:py-28 lg:grid-cols-[0.85fr_1.15fr]">
+          <div data-reveal="left">
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-ember">The whole trick</p>
+            <h2 class="mt-3 font-display text-4xl font-black leading-tight tracking-tight text-oat sm:text-5xl">One pack. <span class="italic text-basil-bright">Three dinners.</span></h2>
+            <p class="mt-5 max-w-md text-lg leading-relaxed text-forest-sage">The secret to a cheap week isn't more recipes — it's overlap. Forkcast builds the week around ingredients that show up again and again, so a single chicken thighs pack quietly becomes three different dinners instead of three separate shops.</p>
+            <p class="mt-6 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-oat"><span class="h-2 w-2 rounded-full bg-ember"></span>Fewer ingredients · less waste · lower bill</p>
+          </div>
+          <div data-reveal="right" style="transition-delay:120ms">
+            <div class="rounded-3xl border border-white/10 bg-white/[0.04] p-4 sm:p-6">__OVERLAP_DIAGRAM__</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Proof -->
+      <section id="week" class="scroll-mt-20 border-y border-sage-line/70 bg-oat-deep/50">
+        <div class="mx-auto max-w-6xl px-5 py-20 sm:py-28">
+          <div data-reveal="up">
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-basil">A whole week, start to finish</p>
+            <h2 class="mt-3 max-w-2xl font-display text-4xl font-black leading-tight tracking-tight text-char sm:text-5xl">Here's the kind of week it makes.</h2>
+            <p class="mt-4 max-w-xl text-base leading-relaxed text-muted">5 overlapping dinners, one list, one prep — the whole payoff on one screen. Open the planner and the numbers update to your kitchen.</p>
+          </div>
+          <!-- plan -->
+          <div data-reveal="up" class="mt-12">
+            <div class="rounded-3xl border border-sage-line bg-white p-6 shadow-warm sm:p-7">
+              <div class="flex items-baseline justify-between"><h3 class="font-display text-lg font-bold tracking-tight text-forest">The plan</h3><span class="text-xs text-muted tnum">5 dinners</span></div>
+              <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="rounded-2xl border border-sage-line bg-oat/60 p-4"><h4 class="font-display text-base font-bold leading-snug tracking-tight text-forest">Honey-Garlic Chicken Thighs</h4><div class="mt-2 flex flex-wrap gap-1.5">__TAG_CHICKEN__ __TAGM_AMERICAN__</div><p class="mt-2.5 text-xs text-muted"><span class="font-medium text-basil">Shares</span> Onion, Garlic, Rice</p></div>
+                <div class="rounded-2xl border border-sage-line bg-oat/60 p-4"><h4 class="font-display text-base font-bold leading-snug tracking-tight text-forest">Chicken Fajita Bowls</h4><div class="mt-2 flex flex-wrap gap-1.5">__TAG_CHICKEN__ __TAGM_MEXICAN__</div><p class="mt-2.5 text-xs text-muted"><span class="font-medium text-basil">Shares</span> Chicken thighs, Onion, Bell pepper</p></div>
+                <div class="rounded-2xl border border-sage-line bg-oat/60 p-4"><h4 class="font-display text-base font-bold leading-snug tracking-tight text-forest">Tuscan Chicken Pasta</h4><div class="mt-2 flex flex-wrap gap-1.5">__TAG_CHICKEN__ __TAGM_ITALIAN__</div><p class="mt-2.5 text-xs text-muted"><span class="font-medium text-basil">Shares</span> Chicken thighs, Onion, Spinach</p></div>
+                <div class="rounded-2xl border border-sage-line bg-oat/60 p-4"><h4 class="font-display text-base font-bold leading-snug tracking-tight text-forest">Sausage & Pepper Skillet</h4><div class="mt-2 flex flex-wrap gap-1.5">__TAG_PORK__ __TAGM_ITALIAN__</div><p class="mt-2.5 text-xs text-muted"><span class="font-medium text-basil">Shares</span> Onion, Bell pepper, Cherry tomatoes</p></div>
+                <div class="rounded-2xl border border-sage-line bg-oat/60 p-4"><h4 class="font-display text-base font-bold leading-snug tracking-tight text-forest">Chickpea Coconut Curry</h4><div class="mt-2 flex flex-wrap gap-1.5">__TAG_VEG__ __TAGM_INDIAN__</div><p class="mt-2.5 text-xs text-muted"><span class="font-medium text-basil">Shares</span> Onion, Garlic, Spinach</p></div>
+                <div class="flex flex-col justify-center rounded-2xl border border-dashed border-basil/30 bg-basil/5 p-4"><p class="text-sm font-medium leading-snug text-forest">Don't like one? Swap it.</p><p class="mt-1 text-xs leading-relaxed text-muted">The list and prep recalculate around your choice.</p></div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-6 grid gap-6 lg:grid-cols-2">
+            <!-- grocery -->
+            <div data-reveal="up" style="transition-delay:80ms">
+              <div class="h-full rounded-3xl border border-sage-line bg-white p-6 shadow-warm sm:p-7">
+                <div class="flex items-baseline justify-between"><h3 class="font-display text-lg font-bold tracking-tight text-forest">One grocery list</h3><span class="text-xs text-muted tnum">16 items</span></div>
+                <div class="mt-4 space-y-4">
+                  <div>
+                    <div class="flex items-center justify-between"><span class="text-[0.7rem] font-semibold uppercase tracking-wider text-muted">Meat &amp; Seafood</span><span class="text-xs text-muted tnum">$19.46</span></div>
+                    <ul class="mt-1.5 space-y-1">
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Chicken thighs</span>__INBADGE3__</span><span class="shrink-0 text-muted tnum">$14.97</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Italian sausage</span></span><span class="shrink-0 text-muted tnum">$4.49</span></li>
+                    </ul>
+                  </div>
+                  <div>
+                    <div class="flex items-center justify-between"><span class="text-[0.7rem] font-semibold uppercase tracking-wider text-muted">Produce</span><span class="text-xs text-muted tnum">$13.94</span></div>
+                    <ul class="mt-1.5 space-y-1">
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Yellow onion</span>__INBADGE5__</span><span class="shrink-0 text-muted tnum">$2.49</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Bell peppers</span>__INBADGE2__</span><span class="shrink-0 text-muted tnum">$3.99</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Cherry tomatoes</span>__INBADGE2__</span><span class="shrink-0 text-muted tnum">$2.99</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Baby spinach</span>__INBADGE2__</span><span class="shrink-0 text-muted tnum">$2.99</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Garlic</span>__INBADGE3__</span><span class="shrink-0 text-muted tnum">$0.79</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Lemon</span></span><span class="shrink-0 text-muted tnum">$0.69</span></li>
+                    </ul>
+                  </div>
+                  <div>
+                    <div class="flex items-center justify-between"><span class="text-[0.7rem] font-semibold uppercase tracking-wider text-muted">Pantry</span><span class="text-xs text-muted tnum">$12.95</span></div>
+                    <ul class="mt-1.5 space-y-1">
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Jasmine rice</span>__INBADGE2__</span><span class="shrink-0 text-muted tnum">$3.99</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Penne pasta</span></span><span class="shrink-0 text-muted tnum">$1.99</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Coconut milk</span></span><span class="shrink-0 text-muted tnum">$1.99</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Diced tomatoes</span></span><span class="shrink-0 text-muted tnum">$1.49</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Chicken stock</span></span><span class="shrink-0 text-muted tnum">$2.50</span></li>
+                      <li class="flex items-center justify-between gap-2 text-sm"><span class="flex min-w-0 items-center gap-2"><span class="truncate text-char">Chickpeas</span></span><span class="shrink-0 text-muted tnum">$0.99</span></li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="mt-5 flex items-end justify-between border-t border-sage-line pt-4"><span class="text-sm font-medium text-char">Estimated total</span><span class="font-display text-2xl font-black tnum text-forest">$51.81</span></div>
+              </div>
+            </div>
+            <!-- prep -->
+            <div data-reveal="up" style="transition-delay:140ms">
+              <div class="rounded-3xl border border-sage-line bg-white p-6 shadow-warm sm:p-7">
+                <div class="flex items-baseline justify-between"><h3 class="font-display text-lg font-bold tracking-tight text-forest">Sunday prep</h3><span class="text-xs text-muted tnum">~90 min, once</span></div>
+                <ol class="mt-4 space-y-3.5">
+                  <li class="flex gap-3.5"><div class="flex w-12 shrink-0 flex-col items-center"><span class="rounded-full bg-basil/10 px-2 py-0.5 text-xs font-semibold text-forest tnum">15m</span><span class="mt-1 w-px flex-1 bg-sage-line"></span></div><div class="pb-0.5"><h4 class="text-sm font-semibold text-char">Mise en place</h4><p class="mt-0.5 text-sm leading-relaxed text-muted">Wash and chop the shared produce — onion, garlic, peppers, spinach — and store it grab-and-go.</p></div></li>
+                  <li class="flex gap-3.5"><div class="flex w-12 shrink-0 flex-col items-center"><span class="rounded-full bg-basil/10 px-2 py-0.5 text-xs font-semibold text-forest tnum">30m</span><span class="mt-1 w-px flex-1 bg-sage-line"></span></div><div class="pb-0.5"><h4 class="text-sm font-semibold text-char">Batch-cook proteins</h4><p class="mt-0.5 text-sm leading-relaxed text-muted">Cook the chicken thighs and sausage in batches; cool and store, ready to flavor per recipe.</p></div></li>
+                  <li class="flex gap-3.5"><div class="flex w-12 shrink-0 flex-col items-center"><span class="rounded-full bg-basil/10 px-2 py-0.5 text-xs font-semibold text-forest tnum">30m</span><span class="mt-1 w-px flex-1 bg-sage-line"></span></div><div class="pb-0.5"><h4 class="text-sm font-semibold text-char">Cook bases &amp; sauces</h4><p class="mt-0.5 text-sm leading-relaxed text-muted">Cook the jasmine rice and penne; build the curry and tomato sauce bases.</p></div></li>
+                  <li class="flex gap-3.5"><div class="flex w-12 shrink-0 flex-col items-center"><span class="rounded-full bg-basil/10 px-2 py-0.5 text-xs font-semibold text-forest tnum">15m</span></div><div class="pb-0.5"><h4 class="text-sm font-semibold text-char">Portion &amp; store</h4><p class="mt-0.5 text-sm leading-relaxed text-muted">Portion everything into containers, labeled by night. Weeknights are now ~10-minute assembly.</p></div></li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div data-reveal="up" style="transition-delay:120ms">
+            <div class="mt-10 flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-center">
+              <button class="js-plan sheen group inline-flex items-center gap-2 rounded-full bg-basil px-6 py-3.5 text-base font-semibold text-oat shadow-warm transition hover:-translate-y-0.5 hover:bg-forest">Make your own week <span class="transition-transform group-hover:translate-x-0.5">→</span></button>
+              <span class="text-sm text-muted">Free. Runs right here in your browser.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Math -->
+      <section id="math" class="grain relative scroll-mt-20 overflow-hidden bg-forest text-oat">
+        <div aria-hidden="true" class="pointer-events-none absolute -left-32 bottom-0 h-96 w-96 rounded-full opacity-40 blur-3xl" style="background: radial-gradient(circle, rgba(234,88,12,.18), transparent 70%)"></div>
+        <div class="relative mx-auto max-w-5xl px-5 py-20 sm:py-28">
+          <div data-reveal="up">
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-ember">The math</p>
+            <h2 class="mt-3 max-w-2xl font-display text-4xl font-black leading-tight tracking-tight text-oat sm:text-5xl">Meal kits solved dinner. For about twelve dollars a plate.</h2>
+          </div>
+          <div class="mt-12 grid items-stretch gap-8 sm:grid-cols-2">
+            <div data-reveal="up">
+              <div class="h-full rounded-3xl border border-white/10 bg-white/[0.04] p-8">
+                <div class="text-sm font-medium text-forest-sage">A meal kit, per plate</div>
+                <div class="mt-2 font-display text-5xl font-black text-forest-sage tnum"><span class="countup" data-to="12" data-prefix="~$" data-decimals="0">~$12</span></div>
+                <div class="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-white/10"><div class="grow-bar h-full rounded-full bg-forest-sage" style="width:100%"></div></div>
+                <p class="mt-4 text-sm leading-relaxed text-forest-sage">Boxes, ice packs, shipping, and a subscription that piles up by the door.</p>
+              </div>
+            </div>
+            <div data-reveal="up" style="transition-delay:120ms">
+              <div class="relative h-full overflow-hidden rounded-3xl border border-ember/30 bg-ember/[0.08] p-8">
+                <div class="text-sm font-medium text-oat">Forkcast, per plate</div>
+                <div class="mt-2 font-display text-6xl font-black text-ember tnum"><span class="countup" data-to="5.18" data-prefix="~$" data-decimals="2">~$5.18</span></div>
+                <div class="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-white/10"><div class="grow-bar h-full rounded-full bg-ember" style="width:43%; transition-delay:120ms"></div></div>
+                <p class="mt-4 text-sm leading-relaxed text-oat/90">The same solved dinner — at your own store, at grocery prices. Software, not shipping.</p>
+              </div>
+            </div>
+          </div>
+          <p data-reveal="up" style="transition-delay:120ms" class="mt-10 max-w-2xl text-lg leading-relaxed text-oat/90">No cardboard. No ice packs. No box to cancel. Just the deciding part, done — and the savings stay with you. <span class="font-semibold text-oat">That's the whole difference.</span></p>
+        </div>
+      </section>
+
+      <!-- Soul -->
+      <section class="mx-auto max-w-6xl px-5 py-20 sm:py-28">
+        <div data-reveal="up">
+          <p class="text-xs font-semibold uppercase tracking-[0.16em] text-basil">Why it feels different</p>
+          <h2 class="mt-3 max-w-2xl font-display text-4xl font-black leading-tight tracking-tight text-char sm:text-5xl">Built for a tired Tuesday. <span class="italic text-basil">Not a perfect one.</span></h2>
+        </div>
+        <div class="mt-12 grid gap-x-10 gap-y-9 sm:grid-cols-2">
+          <div data-reveal="left"><div class="group flex gap-4 border-t border-sage-line pt-6"><span class="mt-1 h-6 w-6 shrink-0">__MARK__</span><div><h3 class="font-display text-xl font-bold tracking-tight text-forest">It decides. You keep the veto.</h3><p class="mt-1.5 text-base leading-relaxed text-muted">Don't like a meal? Swap it, and the list and the prep recalculate around your choice.</p></div></div></div>
+          <div data-reveal="right"><div class="group flex gap-4 border-t border-sage-line pt-6"><span class="mt-1 h-6 w-6 shrink-0">__MARK__</span><div><h3 class="font-display text-xl font-bold tracking-tight text-forest">Easy, fast, cheap, good.</h3><p class="mt-1.5 text-base leading-relaxed text-muted">No guilt, no macros, no “clean eating.” We removed a chore — we didn't add a diet.</p></div></div></div>
+          <div data-reveal="left"><div class="group flex gap-4 border-t border-sage-line pt-6"><span class="mt-1 h-6 w-6 shrink-0">__MARK__</span><div><h3 class="font-display text-xl font-bold tracking-tight text-forest">Your store, your savings.</h3><p class="mt-1.5 text-base leading-relaxed text-muted">Software, not boxes. You shop the prices you already pay, at the cheapest store near you, and pocket the difference.</p></div></div></div>
+          <div data-reveal="right"><div class="group flex gap-4 border-t border-sage-line pt-6"><span class="mt-1 h-6 w-6 shrink-0">__MARK__</span><div><h3 class="font-display text-xl font-bold tracking-tight text-forest">One good answer.</h3><p class="mt-1.5 text-base leading-relaxed text-muted">Not ten thousand recipes at the exact moment you can't make one more decision. Just dinner, handled.</p></div></div></div>
+        </div>
+      </section>
+
+      <!-- CTA -->
+      <section id="waitlist" class="scroll-mt-20 px-5 pb-24 pt-4">
+        <div class="grain relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] bg-forest px-6 py-16 text-center shadow-warm-lg sm:px-12 sm:py-20">
+          <div aria-hidden="true" class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full opacity-50 blur-3xl" style="background: radial-gradient(circle, rgba(234,88,12,.16), transparent 70%)"></div>
+          <div class="relative">
+            <div data-reveal="up">
+              <span class="mx-auto block h-10 w-10">__MARK__</span>
+              <h2 class="mt-6 font-display text-4xl font-black leading-tight tracking-tight text-oat sm:text-5xl">Plan once. Eat all week.</h2>
+              <p class="mx-auto mt-4 max-w-lg text-lg leading-relaxed text-forest-sage">Try the live planner now, or leave your email and we'll bring you in when the full app lands — your first week's on us.</p>
+            </div>
+            <div data-reveal="up" style="transition-delay:90ms" class="mt-8 flex justify-center">
+              <button class="js-plan sheen group inline-flex items-center gap-2 rounded-full bg-oat px-7 py-3.5 text-base font-semibold text-forest shadow-warm transition hover:-translate-y-0.5 hover:bg-white">Plan my week now <span class="transition-transform group-hover:translate-x-0.5">→</span></button>
+            </div>
+            <div data-reveal="up" style="transition-delay:150ms" class="mx-auto mt-10 max-w-md">
+              <div class="flex items-center gap-3 text-xs font-medium uppercase tracking-wider text-forest-sage"><span class="h-px flex-1 bg-white/15"></span>or be first at launch<span class="h-px flex-1 bg-white/15"></span></div>
+              <form id="waitlist-form" class="mt-5" novalidate>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                  <input id="waitlist-email" type="email" required placeholder="you@dinner.com" autocomplete="email" class="tnum w-full flex-1 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-oat outline-none transition placeholder:text-forest-sage/70 focus:border-oat/60 focus:ring-2 focus:ring-oat/20" />
+                  <button type="submit" class="shrink-0 rounded-xl bg-oat px-5 py-3 text-sm font-semibold text-forest shadow-sm transition hover:bg-white">Save my seat</button>
+                </div>
+                <p id="waitlist-msg" class="mt-2 min-h-[1.25rem] text-xs text-forest-sage">First week free at launch. One email, no spam, unsubscribe anytime.</p>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-sage-line bg-oat-deep/60">
+      <div class="mx-auto max-w-6xl px-5 py-12">
+        <div class="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
+          <div class="max-w-sm">
+            <a href="#" class="flex items-center gap-2.5"><span class="h-7 w-7">__MARK__</span><span class="font-display text-xl font-black tracking-tight text-forest">Forkcast</span></a>
+            <p class="mt-3 text-sm leading-relaxed text-muted">The cheap, opinionated meal planner that gives one good answer instead of an endless library. Plan once. Eat all week.</p>
+          </div>
+          <nav class="grid grid-cols-2 gap-x-12 gap-y-2 text-sm">
+            <a href="#how" class="text-muted transition hover:text-forest">How it works</a>
+            <a href="#week" class="text-muted transition hover:text-forest">See a week</a>
+            <a href="#math" class="text-muted transition hover:text-forest">The math</a>
+            <button class="js-plan text-left text-muted transition hover:text-forest">Try the planner</button>
+            <a href="#waitlist" class="font-medium text-basil transition hover:text-forest">Get launch updates</a>
+          </nav>
+        </div>
+        <div class="mt-10 flex flex-col gap-3 border-t border-sage-line pt-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+          <p class="max-w-xl leading-relaxed">A working prototype, running entirely in this one file — recipes from TheMealDB, normalized into Forkcast's own ingredient catalog. Prices are estimates.</p>
+          <p class="shrink-0">© 2026 Forkcast · @forkcast</p>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ====================== PLANNER VIEW ====================== -->
+  <div id="view-planner" hidden class="min-h-screen bg-oat">
+    <header class="sticky top-0 z-10 border-b border-sage-line/70 bg-oat/85 backdrop-blur">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+        <button id="planner-home" class="flex items-center gap-2"><span class="h-6 w-6">__MARK__</span><span class="font-display text-xl font-black tracking-tight text-brand-dark">Forkcast</span><span class="ml-1 hidden text-sm text-stone-500 sm:inline">Plan once. Eat all week.</span></button>
+        <div class="flex items-center gap-2">
+          <button id="regen" hidden class="rounded-full border border-brand/30 bg-white px-4 py-1.5 text-sm font-medium text-brand-dark shadow-sm transition hover:bg-brand/5">↻ Regenerate</button>
+          <button id="planner-home-2" class="hidden rounded-full px-3 py-1.5 text-sm font-medium text-stone-500 transition hover:text-brand-dark sm:inline">← Home</button>
+        </div>
+      </div>
+    </header>
+    <main class="mx-auto grid max-w-6xl gap-8 px-5 py-8 lg:grid-cols-[340px_1fr]">
+      <aside class="lg:sticky lg:top-24 lg:self-start">
+        <div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-stone-500">Set it once</h2>
+          <div class="mt-4 space-y-5">
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-medium text-stone-700">Your location</span>
+              <div class="flex items-center rounded-lg border border-stone-300 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
+                <span class="pl-3 text-stone-400">📍</span>
+                <select id="pref-location" class="w-full cursor-pointer rounded-lg bg-transparent px-2 py-2 text-sm outline-none"></select>
+              </div>
+              <p class="mt-1 text-xs text-stone-400">We'll find the cheapest store within 15 miles.</p>
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-medium text-stone-700">Who's eating?</span>
+              <div class="flex items-center gap-3"><div class="flex items-center rounded-lg border border-stone-300"><button type="button" data-step="-1" class="px-3 py-1.5 text-lg text-stone-500 hover:text-brand-dark">−</button><span id="servings-val" class="w-8 text-center text-sm font-semibold tabular-nums">2</span><button type="button" data-step="1" class="px-3 py-1.5 text-lg text-stone-500 hover:text-brand-dark">+</button></div><span id="servings-suffix" class="text-sm text-stone-500">people</span></div>
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-medium text-stone-700">Dinners this week</span>
+              <div id="seg-nights" class="flex gap-1.5"></div>
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-medium text-stone-700">Diet</span>
+              <div id="seg-diet" class="flex flex-wrap gap-1.5"></div>
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-medium text-stone-700">Skip these (optional)</span>
+              <input id="pref-dislikes" placeholder="e.g. mushrooms, olives" class="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-sm font-medium text-stone-700">Weekly budget (optional)</span>
+              <div class="flex items-center rounded-lg border border-stone-300 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20"><span class="pl-3 text-stone-400">$</span><input id="pref-budget" inputmode="decimal" placeholder="No limit" class="w-full rounded-lg bg-transparent px-2 py-2 text-sm outline-none" /></div>
+            </label>
+          </div>
+          <button id="btn-generate" class="mt-6 w-full rounded-xl bg-brand py-3 text-center font-semibold text-white shadow-sm transition hover:bg-brand-dark disabled:opacity-60">Plan my week</button>
+          <p id="gen-error" class="mt-3 text-sm text-red-600" hidden></p>
+        </div>
+      </aside>
+      <section id="results">
+        <div class="rounded-2xl border border-dashed border-stone-300 bg-white/50 p-10 text-center">
+          <h1 class="mx-auto max-w-md font-display text-4xl font-black tracking-tight text-stone-800">Dinner, <span class="text-brand">decided.</span></h1>
+          <p class="mx-auto mt-3 max-w-md text-stone-600">Set your preferences and Forkcast picks a week of dinners whose ingredients overlap — then hands you one aisle-sorted grocery list, a Sunday prep plan, and the cheapest store near you.</p>
+          <p class="mt-6 text-sm font-medium text-brand-dark">← Start on the left.</p>
+        </div>
+      </section>
+    </main>
+    <footer class="mx-auto max-w-6xl px-5 py-10 text-center text-xs text-stone-400">Prototype · runs entirely in your browser · recipes from TheMealDB, normalized into Forkcast's ingredient catalog · costs are estimates</footer>
+  </div>
+
+  <!-- recipe modal -->
+  <div id="modal-root"></div>
+
+  <script>/*__LOGIC__*/</script>
+  <script>
+    const POOL = /*__POOL__*/;
+    /*__APP__*/
+  </script>
+</body>
+</html>

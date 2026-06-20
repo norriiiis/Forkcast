@@ -1,0 +1,375 @@
+@import "tailwindcss";
+
+:root {
+  /* ---- Forkcast brand palette (see brand/BRAND.md) ---- */
+  --oat: #fbf8f2; /* warm cream — appetizing, not clinical */
+  --oat-deep: #f4eee2; /* a slightly deeper cream for layering */
+  --forest: #14532d; /* deepest brand green — dark backgrounds, depth */
+  --basil: #15803d; /* core brand green — logo, CTAs, emphasis */
+  --basil-bright: #1f9d4e; /* a lifted basil for dark surfaces */
+  --ember: #ea580c; /* the single highlight accent — use sparingly */
+  --char: #1c1917; /* primary text on light */
+  --muted: #6f6a64; /* secondary text on light (brand "Stone") */
+  --sage: #e7eee4; /* light surface tint — cards, panels */
+  --sage-line: #d8e3d4; /* hairline on light */
+  --forest-sage: #a7c0ac; /* supporting text on forest */
+
+  /* Back-compat aliases used by the demo app */
+  --background: var(--oat);
+  --foreground: var(--char);
+  --brand: var(--basil);
+  --brand-dark: var(--forest);
+  --accent: var(--ember);
+}
+
+@theme inline {
+  /* Brand tokens → utilities (bg-oat, text-forest, border-sage, etc.) */
+  --color-oat: var(--oat);
+  --color-oat-deep: var(--oat-deep);
+  --color-forest: var(--forest);
+  --color-basil: var(--basil);
+  --color-basil-bright: var(--basil-bright);
+  --color-ember: var(--ember);
+  --color-char: var(--char);
+  --color-muted: var(--muted);
+  --color-sage: var(--sage);
+  --color-sage-line: var(--sage-line);
+  --color-forest-sage: var(--forest-sage);
+
+  /* Back-compat tokens for the demo */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-accent: var(--accent);
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-fraunces);
+}
+
+body {
+  background: var(--oat);
+  color: var(--char);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular, aligned figures for any price/number — a brand typography rule. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---- Warm texture: a barely-there paper grain so surfaces feel made, not minted.
+   Kept very low opacity — warmth, never noise. ---- */
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.035;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Soft, warm shadow for the "stoneware" cards — diffuse, never harsh black. */
+.shadow-warm {
+  box-shadow:
+    0 1px 2px rgba(28, 25, 23, 0.04),
+    0 12px 32px -12px rgba(20, 83, 45, 0.16);
+}
+.shadow-warm-lg {
+  box-shadow:
+    0 1px 2px rgba(28, 25, 23, 0.05),
+    0 28px 60px -20px rgba(20, 83, 45, 0.28);
+}
+
+/* ---- Motion: warmth in small doses, respectful of reduced-motion ---- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tine-grow {
+  from {
+    transform: scaleY(0.2);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--tilt, 0deg));
+  }
+  50% {
+    transform: translateY(-8px) rotate(var(--tilt, 0deg));
+  }
+}
+
+/* ---- Scroll reveal (JS-driven via IntersectionObserver, works in every browser).
+   Visible by default so no-JS visitors, crawlers, and reduced-motion users always
+   see content. The boot script in layout.tsx adds `.js` to <html> before first
+   paint, which arms the hidden start state (no flash); the Reveal component then
+   adds [data-shown] when the element scrolls into view. ---- */
+[data-reveal] {
+  transition:
+    opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.85s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.8s ease;
+}
+[data-js] [data-reveal] {
+  opacity: 0;
+}
+[data-js] [data-reveal="up"] {
+  transform: translateY(32px);
+}
+[data-js] [data-reveal="left"] {
+  transform: translateX(-36px);
+}
+[data-js] [data-reveal="right"] {
+  transform: translateX(36px);
+}
+[data-js] [data-reveal="scale"] {
+  transform: scale(0.92);
+}
+[data-js] [data-reveal="blur"] {
+  filter: blur(12px);
+}
+[data-js] [data-reveal][data-shown] {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* The fork-forecast mark's tines step up like a forecast — once, on arrival. */
+.tine {
+  transform-origin: bottom;
+  transform-box: fill-box;
+}
+.animate-mark .tine {
+  animation: tine-grow 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-mark .tine:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.animate-mark .tine:nth-child(2) {
+  animation-delay: 0.13s;
+}
+.animate-mark .tine:nth-child(3) {
+  animation-delay: 0.21s;
+}
+.animate-mark .tine:nth-child(4) {
+  animation-delay: 0.29s;
+}
+
+.animate-float {
+  animation: float-soft 7s ease-in-out infinite;
+}
+
+/* ---- Depth & life: aurora glows, floating tokens, draw-on lines, sheen ---- */
+@keyframes aurora-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(5%, -4%, 0) scale(1.12);
+  }
+  66% {
+    transform: translate3d(-4%, 5%, 0) scale(0.94);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+.aurora {
+  will-change: transform;
+  animation: aurora-drift 24s ease-in-out infinite;
+}
+.aurora-slow {
+  animation-duration: 34s;
+  animation-direction: reverse;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translateY(-12px) rotate(var(--r, 0deg));
+  }
+}
+.bob {
+  will-change: transform;
+  animation: bob 6s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 3D tilt (driven by the TiltCard client component via --rx/--ry vars). */
+.tilt-scene {
+  perspective: 1200px;
+}
+.tilt {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 0.25s ease-out;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.tilt-pop {
+  transform: translateZ(40px);
+  transform-style: preserve-3d;
+}
+
+/* Reading-progress bar, scaled by the ScrollProgress client component. */
+.scroll-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  z-index: 60;
+  transform-origin: 0 50%;
+  transform: scaleX(var(--p, 0));
+  background: linear-gradient(90deg, var(--basil), var(--ember));
+}
+
+/* Sheen swipe across primary buttons on hover. */
+.sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%);
+  transform: translateX(-130%);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sheen:hover::after {
+  transform: translateX(130%);
+}
+
+/* Lift-on-hover for cards. */
+.lift {
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lift:hover {
+  transform: translateY(-6px);
+}
+
+/* Overlap-diagram connector lines — draw in when the diagram scrolls into view. */
+.flow-line {
+  stroke-dasharray: var(--len, 320);
+  stroke-dashoffset: var(--len, 320);
+}
+[data-shown] .flow-line {
+  animation: draw-line 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+[data-shown] .flow-line.l2 {
+  animation-delay: 0.18s;
+}
+[data-shown] .flow-line.l3 {
+  animation-delay: 0.36s;
+}
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+/* A short dash that sweeps along a duplicate of each connector — a pulse of
+   "ingredient" flowing to the meals. Pure CSS, perfectly aligned to the path. */
+.flow-pulse {
+  stroke-dasharray: 11 420;
+  stroke-dashoffset: 431;
+  opacity: 0;
+}
+[data-shown] .flow-pulse {
+  opacity: 1;
+  animation: pulse-travel 2.8s linear infinite;
+  animation-delay: 1s;
+}
+[data-shown] .flow-pulse.p2 {
+  animation-delay: 1.5s;
+}
+[data-shown] .flow-pulse.p3 {
+  animation-delay: 2s;
+}
+@keyframes pulse-travel {
+  from {
+    stroke-dashoffset: 431;
+  }
+  to {
+    stroke-dashoffset: 11;
+  }
+}
+
+/* Growing comparison bars in the cost section. */
+.grow-bar {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-shown] .grow-bar {
+  transform: scaleX(1);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem; /* clear the sticky header on anchor jumps */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  [data-js] [data-reveal] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  .animate-mark .tine,
+  .animate-float,
+  .aurora,
+  .bob,
+  [data-shown] .flow-pulse,
+  [data-shown] .flow-line {
+    animation: none;
+  }
+  .flow-line {
+    stroke-dashoffset: 0;
+  }
+  .grow-bar {
+    transform: none;
+  }
+  .tilt {
+    transform: none !important;
+  }
+}

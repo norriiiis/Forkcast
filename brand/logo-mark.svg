@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Forkcast">
+  <!-- Fork-forecast mark: four tines stepping up like a chart -->
+  <g fill="#15803D">
+    <rect x="12" y="26" width="7" height="12" rx="3.5"/>
+    <rect x="23" y="20" width="7" height="18" rx="3.5"/>
+    <rect x="34" y="14" width="7" height="24" rx="3.5"/>
+    <rect x="45" y="8"  width="7" height="30" rx="3.5"/>
+    <rect x="11" y="35" width="42" height="7" rx="3.5"/>
+    <rect x="28" y="40" width="8"  height="18" rx="4"/>
+  </g>
+</svg>
