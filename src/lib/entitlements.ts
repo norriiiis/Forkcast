@@ -16,6 +16,8 @@ export interface Entitlements {
   weeklyEmail: boolean;
   /** Persisted plan history. */
   planHistory: boolean;
+  /** Weekly spend + nutrition report and feedback-driven tuning. */
+  weeklyReport: boolean;
   /** More than one saved address. */
   multipleAddresses: boolean;
   /** Swap a single meal and recalc (vs. regenerate the whole week). */
@@ -31,6 +33,7 @@ const FREE: Entitlements = {
   cheapestStore: false,
   weeklyEmail: false,
   planHistory: false,
+  weeklyReport: false,
   multipleAddresses: false,
   swapMeal: false,
 };
@@ -42,6 +45,7 @@ const PRO: Entitlements = {
   cheapestStore: true,
   weeklyEmail: true,
   planHistory: true,
+  weeklyReport: true,
   multipleAddresses: true,
   swapMeal: true,
 };

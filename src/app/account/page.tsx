@@ -40,6 +40,11 @@ export default async function AccountPage() {
           Forkcast
         </Link>
         <div className="flex items-center gap-4">
+          {ent.weeklyReport && (
+            <Link href="/report" className="text-sm font-medium text-muted transition hover:text-forest">
+              Weekly report
+            </Link>
+          )}
           {ent.planHistory && (
             <Link href="/history" className="text-sm font-medium text-muted transition hover:text-forest">
               Plan history
@@ -102,8 +107,8 @@ export default async function AccountPage() {
         </div>
         <p className="mt-3 text-sm leading-relaxed text-muted">
           {ent.isPro
-            ? "Unlimited plans, the cheapest store near you, the weekly email, and plan history."
-            : "Free includes one plan a week with the grocery list and Sunday prep. Pro unlocks unlimited plans, the cheapest store near your address, and the weekly email."}
+            ? "Unlimited plans, the cheapest store near you, the weekly email, plan history, and your weekly spend + nutrition report."
+            : "Free includes one plan a week with the grocery list and Sunday prep. Pro unlocks unlimited plans, the cheapest store near your address, the weekly email, and a weekly spend + nutrition report."}
         </p>
       </section>
 

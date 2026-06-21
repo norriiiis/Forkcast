@@ -22,6 +22,7 @@ model Ingredient {
   isStaple       Boolean            @default(false) // pantry item assumed on hand (salt, oil, spices)
   packPriceCents Int                @default(0) // typical cost of one grocery purchase of this item
   packLabel      String             @default("") // what that purchase looks like, e.g. "1 lb", "1 bunch"
+  nutritionJson  String? // USDA-sourced per-100g nutrient panel + portion gram-weights (see scripts/nutrition.ts)
   recipeLinks    RecipeIngredient[]
   createdAt      DateTime           @default(now())
 }
@@ -88,6 +89,7 @@ model User {
   stripeCustomerId String? @unique
   referralCode     String? @unique
   referredByCode   String?
+  tuningJson       String? // standing meal-suggestion tuning from the weekly report feedback (see src/lib/tuning.ts)
 
   createdAt DateTime @default(now())
 

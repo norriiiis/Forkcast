@@ -1,4 +1,5 @@
 import type { PlanResult } from "@/lib/engine";
+import { MealNutritionLine } from "@/components/Nutrition";
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -38,6 +39,7 @@ export default function SavedPlanView({ plan }: { plan: PlanResult }) {
                     <span className="font-medium text-brand-dark">Shares:</span> {m.sharedIngredients.slice(0, 5).join(", ")}
                   </p>
                 )}
+                <MealNutritionLine n={m.nutrition} partial={m.nutritionPartial} />
               </div>
             </div>
           ))}

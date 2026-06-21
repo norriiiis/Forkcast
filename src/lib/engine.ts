@@ -14,6 +14,18 @@
 import { prisma } from "@/lib/db";
 import { aisleOrder, AISLES } from "@/lib/ingredient-catalog";
 import { buildRecipeDetail, parseEnriched, type RecipeDetail } from "@/lib/recipe-detail";
+import { curatedNutrition } from "@/lib/nutrition-data";
+import {
+  type IngredientNutrition,
+  type NutritionPanel,
+  parseIngredientNutrition,
+  recipeNutritionPerServing,
+  emptyPanel,
+  addPanels,
+  scalePanel,
+  roundPanel,
+} from "@/lib/nutrition";
+import type { MealTuning } from "@/lib/tuning";
 
 export type Diet = "none" | "vegetarian" | "vegan" | "pescatarian";
 
@@ -23,6 +35,7 @@ export interface Preferences {
   diet: Diet;
   dislikes: string[]; // freeform ingredient terms to avoid
   budgetCents?: number; // optional weekly grocery budget
+  tuning?: MealTuning; // standing feedback from the weekly report (see src/lib/tuning.ts)
 }
 
 interface PoolIngredient {
@@ -33,6 +46,7 @@ interface PoolIngredient {
   packPriceCents: number;
   packLabel: string;
   rawMeasure: string;
+  nutrition: IngredientNutrition | null; // USDA per-100g panel (or curated fallback)
 }
 
 interface PoolRecipe {
@@ -60,6 +74,8 @@ export interface PlannedMeal {
   protein: string; // e.g. "Chicken Breast" or "Vegetarian"
   sharedIngredients: string[]; // ingredients this meal shares with the rest of the plan
   detail: RecipeDetail; // full step-by-step recipe
+  nutrition: NutritionPanel | null; // per single serving; null when we lack data
+  nutritionPartial: boolean; // true when ingredient coverage was low (rough estimate)
 }
 
 export interface GroceryItem {
@@ -86,6 +102,12 @@ export interface PrepBlock {
   tasks: string[];
 }
 
+export interface PlanNutrition {
+  perServing: NutritionPanel; // average per dinner serving across covered meals
+  mealsCovered: number; // how many dinners we had nutrition data for
+  totalMeals: number;
+}
+
 export interface PlanResult {
   preferences: Preferences;
   meals: PlannedMeal[];
@@ -100,6 +122,7 @@ export interface PlanResult {
   overBudget: boolean;
   prep: PrepBlock[];
   weeknightAssembly: { title: string; note: string }[];
+  nutrition: PlanNutrition | null; // per-serving average; null when no data
 }
 
 // ---- Diet / dislike eligibility ----
@@ -173,7 +196,7 @@ function proteinFamily(recipe: PoolRecipe): string {
 const DISH_TYPES: [string, RegExp][] = [
   ["soup", /\b(soup|broth|bortsch|borsch|shchi|chowder|bisque)\b/],
   ["stew", /\b(stew|caldereta|mechado|bourguignon|tagine|goulash|casserole|hotpot|braise|adobo|curry|masala|korma|vindaloo|bharta|d[h]?al)\b/],
-  ["pasta", /\b(pasta|spaghetti|lasagne|lasagna|carbonara|bolognese|noodle|macaroni|ravioli|gnocchi)\b/],
+  ["pasta", /\b(pasta|spaghetti|lasagne|lasagna|carbonara|bolognese|noodle|macaroni|ravioli|gnocchi|linguine|fettuccine|tagliatelle|pappardelle|penne|rigatoni|fusilli|farfalle|orzo|vermicelli|tortellini|cannelloni|orecchiette|udon|ramen)\b/],
   ["stirfry", /\b(stir.?fry|teriyaki|chow mein|fried rice)\b/],
   ["roast", /\b(roast|baked?|traybake|grill|grilled|griddled|tray bake)\b/],
   ["salad", /\b(salad|slaw|tabbouleh|hummus|ezme)\b/],
@@ -202,6 +225,92 @@ function nonStaple(recipe: PoolRecipe): PoolIngredient[] {
   return recipe.ingredients.filter((i) => !i.isStaple);
 }
 
+// ---- Per-recipe nutrition (per serving) ----
+
+// Memoized: selection re-scores the same recipes across slots, and buildResult
+// needs them again — recomputing measure→grams each time would be wasteful.
+const nutritionCache = new WeakMap<PoolRecipe, { panel: NutritionPanel; partial: boolean } | null>();
+
+function recipeNutrition(r: PoolRecipe): { panel: NutritionPanel; partial: boolean } | null {
+  if (nutritionCache.has(r)) return nutritionCache.get(r)!;
+  const res = recipeNutritionPerServing(
+    r.ingredients.map((i) => ({ rawMeasure: i.rawMeasure, aisle: i.aisle, isStaple: i.isStaple, nutrition: i.nutrition })),
+    r.servings,
+  );
+  const out = res ? { panel: res.perServing, partial: res.partial } : null;
+  nutritionCache.set(r, out);
+  return out;
+}
+
+// ---- Tuning: how a recipe scores against the user's standing feedback ----
+
+interface RecipeSignal {
+  protein: number | null; // g per serving
+  carb: number | null; // g per serving
+  carbHeavy: boolean; // pasta/rice/noodle-forward
+  vegScore: number; // 0..3, higher = more vegetable-forward
+}
+
+const signalCache = new WeakMap<PoolRecipe, RecipeSignal>();
+
+function recipeSignal(r: PoolRecipe): RecipeSignal {
+  if (signalCache.has(r)) return signalCache.get(r)!;
+  const nut = recipeNutrition(r);
+  const type = dishType(r);
+  const carbHeavy =
+    type === "pasta" || type === "ricebowl" || r.ingredients.some((i) => i.key === "pasta" || i.key === "noodles" || i.key === "rice");
+  const produceCount = r.ingredients.filter((i) => i.aisle === "Produce" && !i.isStaple).length;
+  const veg = proteinFamily(r) === "vegetarian" ? 2 : 0;
+  const sig: RecipeSignal = {
+    protein: nut?.panel.protein ?? null,
+    carb: nut?.panel.carb ?? null,
+    carbHeavy,
+    vegScore: Math.min(3, veg + Math.min(2, produceCount * 0.4)),
+  };
+  signalCache.set(r, sig);
+  return sig;
+}
+
+// Additive score nudging a candidate toward/away from the user's feedback. Tuned to
+// be meaningful but not to overpower the overlap term (overlap is worth ~6 each).
+function applyTuningScore(cand: PoolRecipe, tuning: MealTuning): number {
+  const sig = recipeSignal(cand);
+  let s = 0;
+
+  if (tuning.protein !== "off" && sig.protein != null) {
+    const delta = (sig.protein - 22) * 0.1; // a 42g-protein dinner ≈ ±2
+    s += tuning.protein === "more" ? delta : -delta;
+  }
+  if (tuning.carbs !== "off") {
+    s += (tuning.carbs === "more" ? 4 : -4) * (sig.carbHeavy ? 1 : 0);
+    if (sig.carb != null) {
+      const d = (sig.carb - 45) * 0.03;
+      s += tuning.carbs === "more" ? d : -d;
+    }
+  }
+  if (tuning.veggies === "more") s += sig.vegScore;
+  if (cand.area && tuning.preferCuisines.includes(cand.area)) s += 4;
+  if (cand.area && tuning.avoidCuisines.includes(cand.area)) s -= 8;
+  return s;
+}
+
+// Ranking key for the protein-anchor under "more protein": prefer the meatiest main,
+// but don't seed a carb-heavy dish (pasta/rice bowl) when they asked for fewer carbs.
+function anchorProtein(r: PoolRecipe, tuning: MealTuning): number {
+  const p = recipeNutrition(r)?.panel.protein ?? 0;
+  return tuning.carbs === "less" && recipeSignal(r).carbHeavy ? p - 30 : p;
+}
+
+// Cost weight + repeat caps shift with tuning (cheaper → weight cost more; more
+// variety → tighter repeat caps).
+function costCoeff(tuning?: MealTuning): number {
+  return tuning?.cheaper ? 0.6 : 0.25;
+}
+function repeatCap(nights: number, tuning?: MealTuning): number {
+  const divisor = tuning?.variety === "more" ? 3 : 2;
+  return Math.max(2, Math.ceil(nights / divisor));
+}
+
 // ---- Selection: greedy overlap maximization ----
 
 function selectRecipes(pool: PoolRecipe[], prefs: Preferences, anchorIndex = 0): PoolRecipe[] {
@@ -221,7 +330,11 @@ function selectRecipes(pool: PoolRecipe[], prefs: Preferences, anchorIndex = 0):
   // For meat-eaters, anchor on a real protein main (not the most generic soup) so the
   // week reads like actual dinners and the cost is realistic.
   const ranked = [...eligiblePool].sort((a, b) => anchorScore(b) - anchorScore(a));
-  const wantsProtein = prefs.diet === "none" || prefs.diet === "pescatarian";
+  // Anchor on a protein main for meat-eaters — unless their feedback asks for less
+  // protein or more veg, in which case let the overlap ranking lead.
+  const tuning = prefs.tuning;
+  const wantsProtein =
+    (prefs.diet === "none" || prefs.diet === "pescatarian") && tuning?.protein !== "less" && tuning?.veggies !== "more";
   let anchorPool = ranked;
   if (wantsProtein) {
     // Favor anchors whose protein recurs a lot in the pool (chicken/beef), so the
@@ -238,7 +351,14 @@ function selectRecipes(pool: PoolRecipe[], prefs: Preferences, anchorIndex = 0):
           (familyCounts.get(proteinFamily(b))! - familyCounts.get(proteinFamily(a))!) ||
           anchorScore(b) - anchorScore(a),
       );
-    if (proteins.length) anchorPool = proteins;
+    if (proteins.length) {
+      // "More protein" feedback re-seeds the week on the meatiest main, so the whole
+      // plan trends higher-protein rather than just nudging the fill.
+      anchorPool =
+        tuning?.protein === "more"
+          ? [...proteins].sort((a, b) => anchorProtein(b, tuning) - anchorProtein(a, tuning))
+          : proteins;
+    }
   }
   const anchor = anchorPool[Math.min(anchorIndex, anchorPool.length - 1)];
 
@@ -251,9 +371,10 @@ function selectRecipes(pool: PoolRecipe[], prefs: Preferences, anchorIndex = 0):
 
   // Reuse a hero protein (that's the whole point) but cap repeats so the week still
   // feels varied — e.g. 3 chicken + 2 others rather than 5 identical braises. The
-  // same cap on dish format keeps it from becoming 5 soups.
-  const maxPerProtein = Math.max(2, Math.ceil(prefs.nights / 2));
-  const maxPerType = Math.max(2, Math.ceil(prefs.nights / 2));
+  // same cap on dish format keeps it from becoming 5 soups. "More variety" feedback
+  // tightens both caps.
+  const maxPerProtein = repeatCap(prefs.nights, tuning);
+  const maxPerType = repeatCap(prefs.nights, tuning);
 
   while (basket.length < target) {
     let best: PoolRecipe | null = null;
@@ -277,8 +398,10 @@ function selectRecipes(pool: PoolRecipe[], prefs: Preferences, anchorIndex = 0):
       // Reward overlap, lightly penalize new distinct ingredients. Cost is only a
       // gentle tiebreaker — we don't want to dodge a good protein just because it's
       // pricey; reusing one pricey pack across meals IS the value. Hard budgets are
-      // handled separately by refineForBudget().
-      const score = overlap * 6 - newCount * 4 - (addedCostCents / 100) * 0.25;
+      // handled separately by refineForBudget(). Tuning nudges toward the user's
+      // standing feedback (more protein, fewer noodles, …).
+      const score =
+        overlap * 6 - newCount * 4 - (addedCostCents / 100) * costCoeff(tuning) + (tuning ? applyTuningScore(cand, tuning) : 0);
 
       if (score > bestAnyScore) {
         bestAnyScore = score;
@@ -444,31 +567,52 @@ function buildResult(selected: PoolRecipe[], prefs: Preferences): PlanResult {
   const servingsProduced = selected.reduce((s, r) => s + r.servings, 0);
   const perServingCents = servingsProduced ? Math.round(totalCents / servingsProduced) : 0;
 
-  // Meals, annotated with the ingredients they share with the rest of the plan.
-  const meals: PlannedMeal[] = selected.map((r) => ({
-    id: r.id,
-    title: r.title,
-    category: r.category,
-    area: r.area,
-    imageUrl: r.imageUrl,
-    protein: primaryProtein(r),
-    sharedIngredients: nonStaple(r)
-      .filter((i) => (counts.get(i.key) ?? 1) > 1)
-      .map((i) => i.displayName),
-    // Prefer the LLM-normalized recipe; fall back to the deterministic build.
-    detail:
-      parseEnriched(r.enriched) ??
-      buildRecipeDetail({
-        servings: r.servings,
-        instructions: r.instructions,
-        ingredients: r.ingredients.map((i) => ({
-          key: i.key,
-          displayName: i.displayName,
-          rawMeasure: i.rawMeasure,
-          isStaple: i.isStaple,
-        })),
-      }),
-  }));
+  // Meals, annotated with the ingredients they share with the rest of the plan and
+  // a per-serving nutrition panel (USDA-sourced, summed from the recipe's measures).
+  const meals: PlannedMeal[] = selected.map((r) => {
+    const nut = recipeNutrition(r);
+    return {
+      id: r.id,
+      title: r.title,
+      category: r.category,
+      area: r.area,
+      imageUrl: r.imageUrl,
+      protein: primaryProtein(r),
+      sharedIngredients: nonStaple(r)
+        .filter((i) => (counts.get(i.key) ?? 1) > 1)
+        .map((i) => i.displayName),
+      // Prefer the LLM-normalized recipe; fall back to the deterministic build.
+      detail:
+        parseEnriched(r.enriched) ??
+        buildRecipeDetail({
+          servings: r.servings,
+          instructions: r.instructions,
+          ingredients: r.ingredients.map((i) => ({
+            key: i.key,
+            displayName: i.displayName,
+            rawMeasure: i.rawMeasure,
+            isStaple: i.isStaple,
+          })),
+        }),
+      nutrition: nut?.panel ?? null,
+      nutritionPartial: nut?.partial ?? false,
+    };
+  });
+
+  // Plan-level nutrition: the average per dinner serving across meals we could cost.
+  const coveredMeals = meals.filter((m): m is PlannedMeal & { nutrition: NutritionPanel } => m.nutrition !== null);
+  const planNutrition: PlanNutrition | null = coveredMeals.length
+    ? {
+        perServing: roundPanel(
+          scalePanel(
+            coveredMeals.reduce((acc, m) => addPanels(acc, m.nutrition), emptyPanel()),
+            1 / coveredMeals.length,
+          ),
+        ),
+        mealsCovered: coveredMeals.length,
+        totalMeals: meals.length,
+      }
+    : null;
 
   return {
     preferences: prefs,
@@ -487,6 +631,7 @@ function buildResult(selected: PoolRecipe[], prefs: Preferences): PlanResult {
       title: m.title,
       note: assemblyNote(selected.find((r) => r.id === m.id)!),
     })),
+    nutrition: planNutrition,
   };
 }
 
@@ -592,6 +737,9 @@ export async function loadPool(): Promise<PoolRecipe[]> {
       packPriceCents: ri.ingredient.packPriceCents,
       packLabel: ri.ingredient.packLabel,
       rawMeasure: ri.rawMeasure,
+      // Hand-verified curated USDA values win for catalog ingredients (the bulk of a
+      // recipe's weight); the live FDC backfill covers the non-catalog long tail.
+      nutrition: curatedNutrition(ri.ingredient.name) ?? parseIngredientNutrition(ri.ingredient.nutritionJson),
     })),
   }));
 }
@@ -619,14 +767,15 @@ export function swapMeal(pool: PoolRecipe[], prefs: Preferences, currentIds: num
 
   // Protein / dish-type caps measured over the meals we're keeping, so a swap
   // can't push the week to 5 of the same protein or 5 soups.
+  const tuning = prefs.tuning;
   const proteinCount = new Map<string, number>();
   const typeCount = new Map<string, number>();
   for (const r of retained) {
     proteinCount.set(proteinFamily(r), (proteinCount.get(proteinFamily(r)) ?? 0) + 1);
     typeCount.set(dishType(r), (typeCount.get(dishType(r)) ?? 0) + 1);
   }
-  const maxPerProtein = Math.max(2, Math.ceil(prefs.nights / 2));
-  const maxPerType = Math.max(2, Math.ceil(prefs.nights / 2));
+  const maxPerProtein = repeatCap(prefs.nights, tuning);
+  const maxPerType = repeatCap(prefs.nights, tuning);
 
   const candidates = pool.filter(
     (r) => !currentIds.includes(r.id) && eligible(r, prefs) && nonStaple(r).length >= 2,
@@ -648,7 +797,8 @@ export function swapMeal(pool: PoolRecipe[], prefs: Preferences, currentIds: num
         addedCostCents += i.packPriceCents;
       }
     }
-    const score = overlap * 6 - newCount * 4 - (addedCostCents / 100) * 0.25;
+    const score =
+      overlap * 6 - newCount * 4 - (addedCostCents / 100) * costCoeff(tuning) + (tuning ? applyTuningScore(cand, tuning) : 0);
     if (score > bestAnyScore) {
       bestAnyScore = score;
       bestAny = cand;

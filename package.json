@@ -9,6 +9,7 @@
     "postinstall": "prisma generate",
     "lint": "eslint",
     "ingest": "tsx scripts/ingest.ts",
+    "nutrition": "tsx scripts/nutrition.ts",
     "retag": "tsx scripts/retag.ts",
     "db:studio": "prisma studio",
     "enrich": "tsx scripts/enrich.ts",

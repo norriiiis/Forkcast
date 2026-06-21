@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadPool, swapMeal, type Diet, type Preferences } from "@/lib/engine";
 import { getCurrentUser } from "@/lib/session";
 import { getUserEntitlements } from "@/lib/entitlements";
+import { getUserTuning } from "@/lib/user-tuning";
 import { prisma } from "@/lib/db";
 import { allow, clientIp } from "@/lib/ratelimit";
 
@@ -66,6 +67,8 @@ export async function POST(req: Request) {
           { status: 403 },
         );
       }
+      // Keep swaps consistent with the user's standing feedback.
+      prefs.tuning = await getUserTuning(user.id);
     }
 
     const pool = await loadPool();

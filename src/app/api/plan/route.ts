@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { generatePlan, type Diet, type Preferences } from "@/lib/engine";
 import { getCurrentUser } from "@/lib/session";
 import { getUserEntitlements } from "@/lib/entitlements";
+import { getUserTuning } from "@/lib/user-tuning";
 import { weeklyPlanCount } from "@/lib/usage";
 import { prisma } from "@/lib/db";
 import { allow, clientIp } from "@/lib/ratelimit";
@@ -45,6 +46,8 @@ export async function POST(req: Request) {
     // teaser) is unlimited. Free users get a rolling weekly plan limit.
     const user = await getCurrentUser();
     if (user) {
+      // Apply the user's standing feedback (more protein, fewer noodles, …).
+      prefs.tuning = await getUserTuning(user.id);
       const ent = await getUserEntitlements(user.id);
       if (ent.weeklyPlanLimit !== null) {
         const used = await weeklyPlanCount(user.id);

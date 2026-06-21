@@ -139,9 +139,14 @@ function HistoryHeader() {
         <Link href="/app" className="font-display text-xl font-black tracking-tight text-brand-dark">
           Forkcast
         </Link>
-        <Link href="/account" className="text-sm font-medium text-stone-500 transition hover:text-brand-dark">
-          Account
-        </Link>
+        <nav className="flex items-center gap-3 text-sm font-medium text-stone-500">
+          <Link href="/report" className="transition hover:text-brand-dark">
+            Report
+          </Link>
+          <Link href="/account" className="transition hover:text-brand-dark">
+            Account
+          </Link>
+        </nav>
       </div>
     </header>
   );

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { PlanResult, PlannedMeal } from "@/lib/engine";
 import { LOCATION_OPTIONS, DEFAULT_LOCATION_ID, SEARCH_RADIUS_MI, type StoreRanking } from "@/lib/store-pricing";
+import { MealNutritionLine, NutritionFacts } from "@/components/Nutrition";
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -265,12 +266,20 @@ export default function Planner({
               </button>
             )}
             {mode === "app" && isPro && (
-              <Link
-                href="/history"
-                className="hidden rounded-full px-3 py-1.5 text-sm font-medium text-stone-500 transition hover:text-brand-dark sm:inline"
-              >
-                History
-              </Link>
+              <>
+                <Link
+                  href="/report"
+                  className="hidden rounded-full px-3 py-1.5 text-sm font-medium text-stone-500 transition hover:text-brand-dark sm:inline"
+                >
+                  Report
+                </Link>
+                <Link
+                  href="/history"
+                  className="hidden rounded-full px-3 py-1.5 text-sm font-medium text-stone-500 transition hover:text-brand-dark sm:inline"
+                >
+                  History
+                </Link>
+              </>
             )}
             {mode === "app" ? (
               <Link
@@ -692,6 +701,7 @@ function PlanSection({
                     <span className="font-medium text-brand-dark">Shares:</span> {m.sharedIngredients.slice(0, 5).join(", ")}
                   </p>
                 )}
+                <MealNutritionLine n={m.nutrition} partial={m.nutritionPartial} />
                 <div className="mt-3 flex items-center gap-2">
                   <button
                     onClick={() => onOpenRecipe(m)}
@@ -757,6 +767,24 @@ function RecipeModal({ meal, onClose }: { meal: PlannedMeal; onClose: () => void
               ))}
             </div>
           </div>
+
+          {meal.nutrition && (
+            <div className="mt-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Nutrition <span className="text-stone-400">· per serving</span>
+              </h3>
+              <div className="mt-2">
+                <NutritionFacts
+                  panel={meal.nutrition}
+                  note={
+                    meal.nutritionPartial
+                      ? "A rough estimate — some ingredients weren't matched to nutrition data."
+                      : "Estimated from USDA data for this recipe's ingredients."
+                  }
+                />
+              </div>
+            </div>
+          )}
 
           <div className="mt-5 grid gap-6 sm:grid-cols-[200px_1fr]">
             <div>
