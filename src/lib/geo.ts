@@ -74,36 +74,57 @@ export async function geocodeAddress(addr: AddressInput): Promise<GeoPoint | nul
   return devGeocode(addr);
 }
 
-const GROCERY_TYPES = "supermarket";
-
 export async function nearbyGroceryStores(
   point: GeoPoint,
   radiusMi: number,
 ): Promise<NearbyStore[]> {
   if (GEO_ENABLED) {
     try {
-      const radiusM = Math.round(radiusMi * 1609.34);
-      const res = await fetch(
-        `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${point.lat},${point.lng}&radius=${radiusM}&type=${GROCERY_TYPES}&key=${process.env.GOOGLE_MAPS_API_KEY}`,
-      );
-      const data = await res.json();
-      const results: NearbyStore[] = (data?.results ?? []).map(
-        (r: {
-          place_id: string;
-          name: string;
-          geometry: { location: { lat: number; lng: number } };
-          vicinity?: string;
-        }) => ({
-          provider: "google",
-          externalId: r.place_id,
-          chain: normalizeChain(r.name),
-          name: r.name,
-          lat: r.geometry.location.lat,
-          lng: r.geometry.location.lng,
-          distanceMi: Math.round(haversineMi(point.lat, point.lng, r.geometry.location.lat, r.geometry.location.lng) * 10) / 10,
+      // Places API (New). The legacy /maps/api/place/nearbysearch endpoint is not
+      // available to Google Cloud projects created after March 2025, so we use the
+      // v1 searchNearby endpoint (POST + field mask).
+      const radiusM = Math.min(50000, Math.round(radiusMi * 1609.34)); // API caps radius at 50 km
+      const res = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": process.env.GOOGLE_MAPS_API_KEY as string,
+          "X-Goog-FieldMask": "places.id,places.displayName,places.location",
+        },
+        body: JSON.stringify({
+          includedTypes: ["supermarket", "grocery_store"],
+          maxResultCount: 20,
+          locationRestriction: {
+            circle: {
+              center: { latitude: point.lat, longitude: point.lng },
+              radius: radiusM,
+            },
+          },
         }),
+      });
+      const data = await res.json();
+      if (data?.error) console.error("Google Places (New) error:", data.error?.message ?? data.error);
+      const results: NearbyStore[] = (data?.places ?? []).map(
+        (r: {
+          id: string;
+          displayName?: { text?: string };
+          location: { latitude: number; longitude: number };
+        }) => {
+          const name = r.displayName?.text ?? "Grocery store";
+          return {
+            provider: "google",
+            externalId: r.id,
+            chain: normalizeChain(name),
+            name,
+            lat: r.location.latitude,
+            lng: r.location.longitude,
+            distanceMi: Math.round(haversineMi(point.lat, point.lng, r.location.latitude, r.location.longitude) * 10) / 10,
+          };
+        },
       );
-      if (results.length) return results.filter((s) => s.distanceMi <= radiusMi);
+      if (results.length) {
+        return results.filter((s) => s.distanceMi <= radiusMi).sort((a, b) => a.distanceMi - b.distanceMi);
+      }
     } catch (e) {
       console.error("Google Places failed, falling back to seeded stores:", e);
     }
