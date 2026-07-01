@@ -575,7 +575,7 @@ function StoresSection({ ranking }: { ranking: NormalizedRanking | null }) {
             <div className="font-display text-3xl font-black tabular-nums text-brand-dark">{money(cheapest.totalCents)}</div>
             {ranking.saveCents > 0 && priciest && (
               <div className="mt-0.5 text-xs font-medium text-accent">
-                save {money(ranking.saveCents)} vs {priciest.chain}
+                save {money(ranking.saveCents)} vs {priciest.name}
               </div>
             )}
           </div>
@@ -598,7 +598,7 @@ function StoresSection({ ranking }: { ranking: NormalizedRanking | null }) {
                   }`}>
                     {i + 1}
                   </span>
-                  <span className="truncate font-medium text-stone-800">{s.chain}</span>
+                  <span className="truncate font-medium text-stone-800">{s.name}</span>
                   <span className="hidden truncate text-xs text-stone-400 sm:inline">{s.tag} · {s.distanceMi} mi</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2 tabular-nums">
